@@ -6,9 +6,11 @@ Author Geoff Webster
 ESP32/TFT + Wifi Current Ver 2.0  15 February 2024
 - Addition of Web OTA function (uses ElegantOTA library)
 - Correction of setIO and sourceUpdate routines to ensure Web interface indicates current selected source
+- Addition of WiFi remote control for volume, source and mute
+- Addition of clock displlay
 
 ESP32/TFT + Wifi version 1.0 11 February 2024
-- Migrated from Arduino + 4x20 LCD version to ESP32 microcontroller and TFT display.
+- Migrated from Arduino + 4x20 LCD version to ESP32 microcontroller and 320x240 TFT colour display.
 - Addition of WiFi remote control
 - Amended RC coding for backlight so only toggles backlight (leaving source, volume and mute unchanged)
 - Replaced original rotary encoder library with ESP32RotaryEncoder library
