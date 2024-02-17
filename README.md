@@ -23,7 +23,7 @@ Additional functionality is provided by use of the ESP32's built-in peripherals.
 * Clock (locked to internet NTP server)
 * OTA software update capability
 
-## Code Libraries
+Code Libraries
 =================
 Interfacing with the TFT display, source selector, IR decoder, rotary encoder/switch, WiFi and NTP uses shared libraries. These are
 * TFT_eSPI (PlatformIO libdeps value = bodmer/TFT_eSPI@^2.3.70)
