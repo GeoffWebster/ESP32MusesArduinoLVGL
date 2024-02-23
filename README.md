@@ -16,7 +16,7 @@ An Infra-red receiver module (TSOP4838) provides remote control of volume level,
 
 The MAS6116 / WM8816 stereo digital volume control provides independently programmable gain of each channel from -111.5dB to +15.5dB together with mute. Communication between the Arduino and the MAS6116 / WM8816 is via an SPI bus.
 
-The 320x240 TFT display with an SPI interface provides visual data for source input selected, volume level (in large characters), balance setting and mute status. It also includes a clock.
+The 320x240 TFT display with an SPI interface provides visual data for source input selected, gain setting (-112dB to 15.5dB) and mute status. It also includes a clock.
 
 Additional functionality is provided by use of the ESP32's built-in peripherals. These are
 * WiFi remote control of volume, source selection and mute

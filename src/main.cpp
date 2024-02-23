@@ -560,7 +560,11 @@ void setVolume()
   }
   float atten = ((float)volume / 2)-112;
   sprintf(buffer1, "    %.1f dB    ", atten);
+  tft.setTextSize(2);
+  tft.setFreeFont(FSS18);
   tft.drawString(buffer1, 150, 120, 1);
+  tft.setTextSize(1);
+  tft.setFreeFont(FSS24);
   notifyClients();
 }
 
@@ -766,7 +770,12 @@ void mute()
 {
   isMuted = 1;
   preamp.mas6116Mute(LOW);
+  tft.setTextSize(2);
+  tft.setFreeFont(FSS18);
   tft.drawString("    Muted    ", 160, 120, 1);
+  tft.setTextSize(1);
+  tft.setFreeFont(FSS24);
+  //tft.drawString("    Muted    ", 160, 120, 1);
   notifyClients();
 }
 
