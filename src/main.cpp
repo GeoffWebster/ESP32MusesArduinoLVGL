@@ -266,9 +266,9 @@ void printLocalTime()
   {
     lastSeconds = currentSeconds;
     strftime (buffer1, 20, "  %H:%M:%S  ", &timeinfo);
-    tft.setFreeFont(FSS18);
+    //tft.setFreeFont(FSS18);
     tft.drawString(buffer1, 160, 40, 1);
-    tft.setFreeFont(FSS24);
+    //tft.setFreeFont(FSS24);
   }
 }
 
