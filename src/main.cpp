@@ -7,7 +7,8 @@ ESP32/TFT + Wifi Current Ver 2.0  15 February 2024
 - Addition of Web OTA function (uses ElegantOTA library)
 - Correction of setIO and sourceUpdate routines to ensure Web interface indicates current selected source
 - Addition of WiFi remote control for volume, source and mute
-- Addition of clock displlay
+- Addition of clock display
+- Amended setVolume routine to display atten/gain (-112dB min to +15.5dB). Previously displayed 0 -255.
 
 ESP32/TFT + Wifi version 1.0 11 February 2024
 - Migrated from Arduino + 4x20 LCD version to ESP32 microcontroller and 320x240 TFT colour display.
@@ -114,6 +115,7 @@ unsigned long milOnFadeOut; // LCD fade timing
 
 /********* Global Variables *******************/
 uint8_t volume;   // current volume, between 0 and VOL_STEPS
+uint8_t vol2;
 uint8_t leftVol;  // current left volume
 uint8_t rightVol; // current right volume
 bool backlight;   // current backlight state
@@ -264,7 +266,9 @@ void printLocalTime()
   {
     lastSeconds = currentSeconds;
     strftime (buffer1, 20, "  %H:%M:%S  ", &timeinfo);
+    tft.setFreeFont(FSS18);
     tft.drawString(buffer1, 160, 40, 1);
+    tft.setFreeFont(FSS24);
   }
 }
 
@@ -554,10 +558,9 @@ void setVolume()
     backlight = ACTIVE;
     digitalWrite(TFT_BL, HIGH); // Turn on backlight
   }
-  sprintf(buffer1, "      %d      ", volume);
-  tft.setTextSize(2);
+  float atten = ((float)volume / 2)-112;
+  sprintf(buffer1, "    %.1f dB    ", atten);
   tft.drawString(buffer1, 150, 120, 1);
-  tft.setTextSize(1);
   notifyClients();
 }
 
@@ -763,10 +766,7 @@ void mute()
 {
   isMuted = 1;
   preamp.mas6116Mute(LOW);
-  //tft.fillScreen(TFT_WHITE);
-  tft.setTextSize(2);
-  tft.drawString("Muted", 160, 110, 1);
-  tft.setTextSize(1);
+  tft.drawString("    Muted    ", 160, 120, 1);
   notifyClients();
 }
 
@@ -870,7 +870,7 @@ void setup()
   tft.drawString(softTitle2, 160, 120, 1);
   tft.drawString("SW ver " VERSION_NUM, 160, 160, 1);
   delay(4000);
-  tft.setFreeFont(FF24);
+  tft.setFreeFont(FSS24);
   tft.fillScreen(TFT_WHITE);
 
   // This initialises the Source select pins as outputs, all deselected (i.e. o/p=low)
