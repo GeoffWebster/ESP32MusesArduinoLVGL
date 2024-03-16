@@ -15,6 +15,7 @@ The Quadrature rotary encoder/switch (PEC11R) provides control of the volume as 
 An Infra-red receiver module (TSOP4838) provides remote control of volume level, balance, mute, source select and display on/off. RC5 protocol was chosen as I had a remote transmitter from my existing preamplifier using that code. It's also the protocol used by many freely available transmitters.
 
 The MAS6116 / WM8816 stereo digital volume control provides independently programmable gain of each channel from -111.5dB to +15.5dB together with mute. Communication between the Arduino and the MAS6116 / WM8816 is via an SPI bus.
+The MAS6116 device digital I/O requires 5V signal levels while the ESP32 is a 3.3V device. Consequently there is need for 5V/3.3V level shift interface between these two - this is necessary for the MUTE, CS, MOSI and MISO signals between the two. It's not necessay on any of the other device interfaces.
 
 The 320x240 TFT display with an SPI interface provides visual data for source input selected, gain setting (-112dB to 15.5dB) and mute status. It also includes a clock.
 
