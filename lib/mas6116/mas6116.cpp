@@ -24,13 +24,14 @@ void mas6116::mas6116Write(unsigned char mas6116Reg, unsigned char value)
 {
 	// mas6116 datasheet recommends setting "don't care" bits to HIGH
 	unsigned char address = (mas6116Reg & mas6116RegMask) | ~(mas6116RegMask | mas6116ReadBit);
+	//set MAS6116 SPI frequency, then MAS6116 CS pin low to select the vol chip
 	begin_mas6116_read_write();
 	//  send in the address and value via SPI
 	SPI.transfer(address);
 	SPI.transfer(value);
+	// Reset the SPI frequency, then MAS CS pin high to deselect the vol chip
 	end_mas6116_read_write();
-	// take the CS pin high to deselect the vol chip
-	digitalWrite(_mas_CS, HIGH); //PA1;
+	
 }
 
 unsigned char mas6116::mas6116Read(unsigned char mas6116Reg)

@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-#define SPI_MAS6116_FREQUENCY 10000000
+#define SPI_MAS6116_FREQUENCY 8000000 //Spec max is 10000000
 
 // mas6116 register addresses
 // Bits 6..3 contain the actual register address
