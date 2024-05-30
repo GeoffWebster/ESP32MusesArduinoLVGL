@@ -853,8 +853,7 @@ void setup()
 
   // This is where the rotary inputs are configured and the interrupts get attached
   rotaryEncoder.begin();
-  /*
-
+  
   initLittleFS();
   initWiFi();
   initWebSocket();
@@ -862,7 +861,7 @@ void setup()
 
   // Init and get the time
   initTime("GMT0BST,M3.5.0/1,M10.4.0");   // Set for Europe / London
-  */
+  
   // Initialise the TFT screen
   tft.init();
   tft.setRotation(1);
@@ -891,8 +890,7 @@ void setup()
   preferences.begin("settings", RW_MODE);
   source = preferences.getUInt("SOURCE", 1);
   volume = preferences.getUInt("VOLUME", 15);
-/*
-  printLocalTime();*/
+  printLocalTime();
   // set startup volume
   setVolume();
   // set source
@@ -904,8 +902,8 @@ void setup()
 
 void loop()
 {
-  //ElegantOTA.loop();
+  ElegantOTA.loop();
   RC5Update();
   RotaryUpdate();
-  //printLocalTime();
+  printLocalTime();
 }

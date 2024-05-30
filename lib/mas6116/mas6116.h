@@ -23,6 +23,7 @@ class mas6116
 private:
     int _mutePin;
     int _mas_CS;
+    
 #define MAS_CS_L                    \
     GPIO.out_w1tc = (1 << _mas_CS); \
     GPIO.out_w1tc = (1 << _mas_CS)
@@ -36,7 +37,6 @@ public:
     int mutePin;
     int mas_CS;
     mas6116(int mutePin, int mas_CS);
-
     void mas6116Write(unsigned char mas6116Reg, unsigned char value);
     void mas6116Mute(unsigned char);
     unsigned char mas6116Read(unsigned char mas6116Reg);
