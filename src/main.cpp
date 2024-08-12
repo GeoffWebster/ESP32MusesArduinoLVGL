@@ -50,7 +50,7 @@ Arduino + 4x20 LCD version 2.0 Date	27 April 2022
 // Current software
 #define softTitle1 "ESP32/TFT"
 #define softTitle2 "Pre-amp Controller"
-//version number
+// version number
 #define VERSION_NUM "2.0"
 
 /******* MACHINE STATES *******/
@@ -84,9 +84,10 @@ RC5 rc5(IR_PIN);
 // define preAmp control pins
 const int mutePin = 17;
 const int mas_CS = 16;
+const int level_CS = 2;
 
 // preAmp construct
-mas6116 preamp(mutePin, mas_CS);
+mas6116 preamp(mutePin, mas_CS, level_CS);
 
 // define encoder pins
 const uint8_t DI_ENCODER_A = 33;
@@ -114,7 +115,7 @@ unsigned long milOnFadeIn;  // LCD fade timing
 unsigned long milOnFadeOut; // LCD fade timing
 
 /********* Global Variables *******************/
-uint8_t volume;   // current volume, between 0 and VOL_STEPS
+uint8_t volume; // current volume, between 0 and VOL_STEPS
 uint8_t vol2;
 uint8_t leftVol;  // current left volume
 uint8_t rightVol; // current right volume
@@ -194,62 +195,77 @@ void onOTAEnd(bool success);
 
 unsigned long ota_progress_millis = 0;
 
-void onOTAStart() {
+void onOTAStart()
+{
   // Log when OTA has started
   Serial.println("OTA update started!");
   // <Add your own code here>
 }
 
-void onOTAProgress(size_t current, size_t final) {
+void onOTAProgress(size_t current, size_t final)
+{
   // Log every 1 second
-  if (millis() - ota_progress_millis > 1000) {
+  if (millis() - ota_progress_millis > 1000)
+  {
     ota_progress_millis = millis();
     Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
   }
 }
 
-void onOTAEnd(bool success) {
+void onOTAEnd(bool success)
+{
   // Log when OTA has finished
-  if (success) {
+  if (success)
+  {
     Serial.println("OTA update finished successfully!");
-  } else {
+  }
+  else
+  {
     Serial.println("There was an error during OTA update!");
   }
 }
 
-void setTimezone(String timezone){
-  Serial.printf("  Setting Timezone to %s\n",timezone.c_str());
-  setenv("TZ",timezone.c_str(),1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
+void setTimezone(String timezone)
+{
+  Serial.printf("  Setting Timezone to %s\n", timezone.c_str());
+  setenv("TZ", timezone.c_str(), 1); //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
   tzset();
 }
 
-void initTime(String timezone){
+void initTime(String timezone)
+{
   struct tm timeinfo;
+  tft.drawString("Setting up time", 160, 160, 1);
 
-  Serial.println("Setting up time");
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);    // First connect to NTP server, with 0 TZ offset
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("  Failed to obtain time");
+  //Serial.println("Setting up time");
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // First connect to NTP server, with 0 TZ offset
+  if (!getLocalTime(&timeinfo))
+  {
+    tft.drawString("Failed to obtain time", 160, 160, 1);
+    //Serial.println("  Failed to obtain time");
     return;
   }
-  Serial.println("  Got the time from NTP");
+  tft.drawString("Got the time from NTP", 160, 160, 1);
+  //Serial.println("  Got the time from NTP");
   // Now we can set the real timezone
   setTimezone(timezone);
 }
 
-void setTime(int yr, int month, int mday, int hr, int minute, int sec, int isDst){
+void setTime(int yr, int month, int mday, int hr, int minute, int sec, int isDst)
+{
   struct tm tm;
 
-  tm.tm_year = yr - 1900;   // Set date
-  tm.tm_mon = month-1;
+  tm.tm_year = yr - 1900; // Set date
+  tm.tm_mon = month - 1;
   tm.tm_mday = mday;
-  tm.tm_hour = hr;      // Set time
+  tm.tm_hour = hr; // Set time
   tm.tm_min = minute;
   tm.tm_sec = sec;
-  tm.tm_isdst = isDst;  // 1 or 0
+  tm.tm_isdst = isDst; // 1 or 0
   time_t t = mktime(&tm);
-  Serial.printf("Setting time: %s", asctime(&tm));
-  struct timeval now = { .tv_sec = t };
+  tft.drawString("Setting time", 160, 160, 1);
+  //Serial.printf("Setting time: %s", asctime(&tm));
+  struct timeval now = {.tv_sec = t};
   settimeofday(&now, NULL);
 }
 
@@ -258,17 +274,18 @@ void printLocalTime()
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo))
   {
-    Serial.println("Failed to obtain time");
+    tft.drawString("Failed to obtain time", 160, 160, 1);
+    //Serial.println("Failed to obtain time");
     return;
   }
   currentSeconds = timeinfo.tm_sec;
   if (lastSeconds != currentSeconds)
   {
     lastSeconds = currentSeconds;
-    strftime (buffer1, 20, "  %H:%M:%S  ", &timeinfo);
-    //tft.setFreeFont(FSS18);
+    strftime(buffer1, 20, "  %H:%M:%S  ", &timeinfo);
+    // tft.setFreeFont(FSS18);
     tft.drawString(buffer1, 160, 40, 1);
-    //tft.setFreeFont(FSS24);
+    // tft.setFreeFont(FSS24);
   }
 }
 
@@ -339,7 +356,7 @@ void initWebServer()
 {
   server.on("/", onRootRequest);
   server.serveStatic("/", LittleFS, "/");
-  ElegantOTA.begin(&server);    // Start ElegantOTA
+  ElegantOTA.begin(&server); // Start ElegantOTA
   // ElegantOTA callbacks
   ElegantOTA.onStart(onOTAStart);
   ElegantOTA.onProgress(onOTAProgress);
@@ -558,14 +575,14 @@ void setVolume()
     backlight = ACTIVE;
     digitalWrite(TFT_BL, HIGH); // Turn on backlight
   }
-  float atten = ((float)volume / 2)-112;
+  float atten = ((float)volume / 2) - 112;
   sprintf(buffer1, "    %.1f dB    ", atten);
   tft.setTextSize(2);
   tft.setFreeFont(FSS18);
   tft.drawString(buffer1, 150, 120, 1);
   tft.setTextSize(1);
   tft.setFreeFont(FSS24);
-  notifyClients();
+  //notifyClients();
 }
 
 void sourceUpdate()
@@ -758,8 +775,8 @@ void unMute()
   }
   isMuted = 0;
   preamp.mas6116Mute(HIGH);
-  //tft.fillScreen(TFT_WHITE);
-  // set volume
+  // tft.fillScreen(TFT_WHITE);
+  //  set volume
   setVolume();
   // set source
   setIO();
@@ -775,8 +792,8 @@ void mute()
   tft.drawString("    Muted    ", 160, 120, 1);
   tft.setTextSize(1);
   tft.setFreeFont(FSS24);
-  //tft.drawString("    Muted    ", 160, 120, 1);
-  notifyClients();
+  // tft.drawString("    Muted    ", 160, 120, 1);
+  //notifyClients();
 }
 
 void toggleMute()
@@ -828,7 +845,7 @@ void setIO()
     // set volume
     setVolume();
   }
-  notifyClients();
+  //notifyClients();
   tft.drawString(inputName[source - 1], 150, 200, 1);
 }
 
@@ -853,15 +870,14 @@ void setup()
 
   // This is where the rotary inputs are configured and the interrupts get attached
   rotaryEncoder.begin();
-  
-  initLittleFS();
-  initWiFi();
-  initWebSocket();
-  initWebServer();
 
-  // Init and get the time
-  initTime("GMT0BST,M3.5.0/1,M10.4.0");   // Set for Europe / London
+  //initLittleFS();
+  //initWiFi();
+  //initWebSocket();
+  //initWebServer();
+
   
+
   // Initialise the TFT screen
   tft.init();
   tft.setRotation(1);
@@ -878,7 +894,9 @@ void setup()
   tft.drawString(softTitle1, 160, 80, 1);
   tft.drawString(softTitle2, 160, 120, 1);
   tft.drawString("SW ver " VERSION_NUM, 160, 160, 1);
-  delay(4000);
+  delay(2000);
+  // Init and get the time
+  //initTime("GMT0BST,M3.5.0/1,M10.4.0"); // Set for Europe / London
   tft.setFreeFont(FSS24);
   tft.fillScreen(TFT_WHITE);
 
@@ -890,7 +908,9 @@ void setup()
   preferences.begin("settings", RW_MODE);
   source = preferences.getUInt("SOURCE", 1);
   volume = preferences.getUInt("VOLUME", 15);
-  printLocalTime();
+  //printLocalTime();
+  digitalWrite(level_CS, HIGH);
+  delay(10);
   // set startup volume
   setVolume();
   // set source
@@ -902,8 +922,8 @@ void setup()
 
 void loop()
 {
-  ElegantOTA.loop();
+  //ElegantOTA.loop();
   RC5Update();
   RotaryUpdate();
-  printLocalTime();
+  //printLocalTime();
 }

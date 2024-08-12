@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-#define SPI_MAS6116_FREQUENCY 8000000 //Spec max is 10000000
+#define SPI_MAS6116_FREQUENCY 8000000 // Spec max is 10000000
 
 // mas6116 register addresses
 // Bits 6..3 contain the actual register address
@@ -23,20 +23,19 @@ class mas6116
 private:
     int _mutePin;
     int _mas_CS;
-    
+    int _level_CS;
 #define MAS_CS_L                    \
     GPIO.out_w1tc = (1 << _mas_CS); \
     GPIO.out_w1tc = (1 << _mas_CS)
 #define MAS_CS_H GPIO.out_w1ts = (1 << _mas_CS)  //;GPIO.out_w1ts = (1 << _mas_CS)
     bool locked, inTransaction, lockTransaction; // SPI transaction and mutex lock flags
 
-    inline void begin_mas6116_read_write(void);
-    inline void end_mas6116_read_write(void);
-
 public:
     int mutePin;
     int mas_CS;
-    mas6116(int mutePin, int mas_CS);
+    mas6116(int mutePin, int mas_CS, int level_CS);
+    void begin_mas6116_read_write(void);
+    void end_mas6116_read_write(void);
     void mas6116Write(unsigned char mas6116Reg, unsigned char value);
     void mas6116Mute(unsigned char);
     unsigned char mas6116Read(unsigned char mas6116Reg);
