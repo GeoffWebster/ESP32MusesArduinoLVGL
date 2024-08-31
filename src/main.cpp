@@ -84,10 +84,9 @@ RC5 rc5(IR_PIN);
 // define preAmp control pins
 const int mutePin = 17;
 const int mas_CS = 16;
-const int level_CS = 2;
 
 // preAmp construct
-mas6116 preamp(mutePin, mas_CS, level_CS);
+mas6116 preamp(mutePin, mas_CS);
 
 // define encoder pins
 const uint8_t DI_ENCODER_A = 33;
@@ -909,7 +908,6 @@ void setup()
   source = preferences.getUInt("SOURCE", 1);
   volume = preferences.getUInt("VOLUME", 15);
   //printLocalTime();
-  digitalWrite(level_CS, HIGH);
   delay(10);
   // set startup volume
   setVolume();
