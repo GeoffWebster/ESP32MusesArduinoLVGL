@@ -15,9 +15,16 @@
 
 <body>
   <div class="panel">
-    <h1>ESP32/TFT Pre-amp controller</h1>
-    <div id="source">%SOURCE%</div>
-    <button id="ipSelect">Source select</button>
+    <h1>MUSES72323 Pre-amp</h1>
+    <table>
+      <tr><div id="source">%SOURCE%</div></tr>
+      <tr>
+        <td><button id="phono">Phono</button></td>
+        <td><button id="media">Media</button></td>
+        <td><button id="cd">CD</button></td>
+        <td><button id="tuner">Tuner</button></td>
+      </tr>
+    </table>
     <button id="volup">Vol Up</button>
     <div id="volume" class=%STATE1%>%VOLUME%</div>
     <div id="muted" class=%STATE2%>Muted</div>

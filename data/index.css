@@ -31,6 +31,7 @@ body {
 .panel {
   display: grid;
   grid-gap: 3em;
+  align-items: center;
   justify-items: center;
 }
 
@@ -53,7 +54,11 @@ h1 {
 }
 
 #volume::before {
-  content: "Volume: ";
+  content: "Atten: ";
+}
+
+#volume::after {
+  content:" dB";
 }
 
 #muted {

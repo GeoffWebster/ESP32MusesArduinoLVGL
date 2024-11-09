@@ -3,6 +3,10 @@
 
 Author Geoff Webster
 
+ESP32/TFT + Wifi Current Ver 3.0   4 November 2024
+- Removal of mas6116 volume controller routines
+- Replace with MUSES72323 volume controller routines
+
 ESP32/TFT + Wifi Current Ver 2.0  15 February 2024
 - Addition of Web OTA function (uses ElegantOTA library)
 - Correction of setIO and sourceUpdate routines to ensure Web interface indicates current selected source
@@ -34,24 +38,26 @@ Arduino + 4x20 LCD version 2.0 Date	27 April 2022
 #include <SPI.h>
 #include <TFT_eSPI.h> // Hardware-specific library
 #include <RC5.h>
-#include <mas6116.h> // Hardware-specific library
+#include <muses72323.h> // Hardware-specific library
 #include <ESP32RotaryEncoder.h>
 #include <MCP23S08.h> // Hardware-specific library
 #include <LittleFS.h>
 #include <FS.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include "time.h"
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
 #include <AsyncTCP.h>
 #include <ArduinoJson.h>
 #include "Free_Fonts.h" // Include the Free fonts header file
+#define FlashFS LittleFS
 
 // Current software
 #define softTitle1 "ESP32/TFT"
 #define softTitle2 "Pre-amp Controller"
 // version number
-#define VERSION_NUM "2.0"
+#define VERSION_NUM "3.0"
 
 /******* MACHINE STATES *******/
 #define STATE_BALANCE 1 // when user adjusts balance
@@ -82,11 +88,12 @@ unsigned int IR_PIN = 27;
 RC5 rc5(IR_PIN);
 
 // define preAmp control pins
-const int mutePin = 17;
-const int mas_CS = 16;
+const int s_select_72323 = 16;
+//  The address wired into the muses chip (usually 0).
+static const byte MUSES_ADDRESS = 0;
 
 // preAmp construct
-mas6116 preamp(mutePin, mas_CS);
+static Muses72323 Muses(MUSES_ADDRESS, s_select_72323); // muses chip address (usually 0), slave select pin0;
 
 // define encoder pins
 const uint8_t DI_ENCODER_A = 33;
@@ -114,11 +121,9 @@ unsigned long milOnFadeIn;  // LCD fade timing
 unsigned long milOnFadeOut; // LCD fade timing
 
 /********* Global Variables *******************/
-uint8_t volume; // current volume, between 0 and VOL_STEPS
-uint8_t vol2;
-uint8_t leftVol;  // current left volume
-uint8_t rightVol; // current right volume
-bool backlight;   // current backlight state
+float atten;     // current attenuation, between 0 and -111.75
+int16_t volume; // current volume, between 0 and -447
+bool backlight;  // current backlight state
 uint16_t counter = 0;
 uint8_t source;        // current input channel
 uint8_t oldsource = 1; // previous input channel
@@ -143,6 +148,7 @@ volatile bool turnedRightFlag = false;
 volatile bool turnedLeftFlag = false;
 
 char buffer1[20] = "";
+char buffer2[20] = "";
 
 // Global Constants
 //------------------
@@ -244,10 +250,11 @@ void initTime(String timezone)
     //Serial.println("  Failed to obtain time");
     return;
   }
-  tft.drawString("Got the time from NTP", 160, 160, 1);
+  tft.drawString("Got NTP Server time", 160, 160, 1);
   //Serial.println("  Got the time from NTP");
   // Now we can set the real timezone
   setTimezone(timezone);
+  delay(500);
 }
 
 void setTime(int yr, int month, int mday, int hr, int minute, int sec, int isDst)
@@ -282,9 +289,7 @@ void printLocalTime()
   {
     lastSeconds = currentSeconds;
     strftime(buffer1, 20, "  %H:%M:%S  ", &timeinfo);
-    // tft.setFreeFont(FSS18);
     tft.drawString(buffer1, 160, 40, 1);
-    // tft.setFreeFont(FSS24);
   }
 }
 
@@ -294,15 +299,11 @@ void printLocalTime()
 
 void initLittleFS()
 {
-  if (!LittleFS.begin())
-  {
-    Serial.println("Cannot mount LittleFS volume...");
-    while (1)
-    {
-      // onboard_led.on = millis() % 200 < 50;
-      // onboard_led.update();
-    }
+  if (!LittleFS.begin()) {
+    Serial.println("Flash FS initialisation failed!");
+    while (1) yield(); // Stay here twiddling thumbs waiting
   }
+  Serial.println("\nFlash FS available!");
 }
 
 // ----------------------------------------------------------------------------
@@ -373,9 +374,7 @@ void notifyClients()
   json["source"] = inputName[source - 1];
   json["volume"] = volume;
   json["mute"] = isMuted ? "on" : "off";
-  // serializeJson(json, Serial);
-  // Serial.println();
-  char buffer[50];
+  char buffer[60];
   size_t len = serializeJson(json, buffer);
   ws.textAll(buffer, len);
 }
@@ -393,20 +392,44 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       Serial.println(err.c_str());
       return;
     }
-    if (json["Select"])
+ 
+   if (json["Phono"])
     {
-      const char *sel = json["Select"];
+      const char *sel = json["Phono"];
       if (strcmp(sel, "toggle") == 0)
       {
         oldsource = source;
-        if (oldsource < 4)
-        {
-          source++;
-        }
-        else
-        {
-          source = 1;
-        }
+        source = 1;
+        setIO();
+      }
+    }
+    else if (json["Media"])
+    {
+      const char *sel = json["Media"];
+      if (strcmp(sel, "toggle") == 0)
+      {
+        oldsource = source;
+        source = 2;
+        setIO();
+      }
+    }
+    else if (json["CD"])
+    {
+      const char *sel = json["CD"];
+      if (strcmp(sel, "toggle") == 0)
+      {
+        oldsource = source;
+        source = 3;
+        setIO();
+      }
+    }
+    else if (json["Tuner"])
+    {
+      const char *sel = json["Tuner"];
+      if (strcmp(sel, "toggle") == 0)
+      {
+        oldsource = source;
+        source = 4;
         setIO();
       }
     }
@@ -419,7 +442,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         {
           unMute();
         }
-        if (volume < 255)
+        if (volume < 0)
         {
           volume = volume + 1;
           setVolume();
@@ -435,7 +458,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         {
           unMute();
         }
-        if (volume > 0)
+        if (volume > -447)
         {
           volume = volume - 1;
           setVolume();
@@ -539,7 +562,7 @@ void volumeUpdate()
     {
       unMute();
     }
-    if (volume < 255)
+    if (volume < 0)
     {
       volume = volume + 1;
       setVolume();
@@ -553,7 +576,7 @@ void volumeUpdate()
     {
       unMute();
     }
-    if (volume != 0)
+    if (volume != 447)
     {
       volume = volume - 1;
       setVolume();
@@ -566,22 +589,22 @@ void volumeUpdate()
 void setVolume()
 {
   // set new volume setting
-  preamp.mas6116Write(mas6116RegBoth, volume);
-  preferences.putUInt("VOLUME", volume);
+  Muses.setVolume(volume, volume);
+  preferences.putInt("VOLUME", volume);
   // display volume setting
   if (!backlight)
   {
     backlight = ACTIVE;
     digitalWrite(TFT_BL, HIGH); // Turn on backlight
   }
-  float atten = ((float)volume / 2) - 112;
-  sprintf(buffer1, "    %.1f dB    ", atten);
+  float atten = ((float)volume / 4);
+  sprintf(buffer2, "  %.2fdB  ", atten);
   tft.setTextSize(2);
   tft.setFreeFont(FSS18);
-  tft.drawString(buffer1, 150, 120, 1);
+  tft.drawString(buffer2, 150, 120, 1);
   tft.setTextSize(1);
   tft.setFreeFont(FSS24);
-  //notifyClients();
+  notifyClients();
 }
 
 void sourceUpdate()
@@ -705,7 +728,7 @@ void RC5Update()
         {
           unMute();
         }
-        if (volume < 255)
+        if (volume < 0)
         {
           volume = volume + 1;
           setVolume();
@@ -717,7 +740,7 @@ void RC5Update()
         {
           unMute();
         }
-        if (volume != 0)
+        if (volume != 447)
         {
           volume = volume - 1;
           setVolume();
@@ -773,8 +796,6 @@ void unMute()
     digitalWrite(TFT_BL, HIGH);
   }
   isMuted = 0;
-  preamp.mas6116Mute(HIGH);
-  // tft.fillScreen(TFT_WHITE);
   //  set volume
   setVolume();
   // set source
@@ -785,14 +806,13 @@ void unMute()
 void mute()
 {
   isMuted = 1;
-  preamp.mas6116Mute(LOW);
+  Muses.mute();
   tft.setTextSize(2);
   tft.setFreeFont(FSS18);
   tft.drawString("    Muted    ", 160, 120, 1);
   tft.setTextSize(1);
   tft.setFreeFont(FSS24);
-  // tft.drawString("    Muted    ", 160, 120, 1);
-  //notifyClients();
+  notifyClients();
 }
 
 void toggleMute()
@@ -839,12 +859,11 @@ void setIO()
       digitalWrite(TFT_BL, HIGH);
     }
     isMuted = 0;
-    preamp.mas6116Mute(HIGH);
     tft.fillScreen(TFT_WHITE);
     // set volume
     setVolume();
   }
-  //notifyClients();
+  notifyClients();
   tft.drawString(inputName[source - 1], 150, 200, 1);
 }
 
@@ -870,12 +889,16 @@ void setup()
   // This is where the rotary inputs are configured and the interrupts get attached
   rotaryEncoder.begin();
 
-  //initLittleFS();
-  //initWiFi();
-  //initWebSocket();
-  //initWebServer();
-
-  
+  initLittleFS();
+  initWiFi();
+  if (!MDNS.begin("esp32HiFi")) {
+    Serial.println("Error setting up MDNS responder!");
+    while (1) {
+      delay(1000);
+    }
+  }
+  initWebSocket();
+  initWebServer();
 
   // Initialise the TFT screen
   tft.init();
@@ -884,7 +907,7 @@ void setup()
   // Set text datum to middle centre
   tft.setTextDatum(MC_DATUM);
   tft.setFreeFont(FSS18);
-
+  
   // Clear the screen
   tft.fillScreen(TFT_WHITE);
   // show software version briefly in display
@@ -893,9 +916,10 @@ void setup()
   tft.drawString(softTitle1, 160, 80, 1);
   tft.drawString(softTitle2, 160, 120, 1);
   tft.drawString("SW ver " VERSION_NUM, 160, 160, 1);
-  delay(2000);
+    delay(2000);
   // Init and get the time
-  //initTime("GMT0BST,M3.5.0/1,M10.4.0"); // Set for Europe / London
+  initTime("GMT0BST,M3.5.0/1,M10.4.0"); // Set for Europe / London
+
   tft.setFreeFont(FSS24);
   tft.fillScreen(TFT_WHITE);
 
@@ -903,11 +927,16 @@ void setup()
   MCP.begin();
   MCP.pinMode8(0x00); //  0 = output , 1 = input
 
+  // Initialize muses (SPI, pin modes)...
+  Muses.begin();
+  Muses.setExternalClock(false); // must be set!
+  Muses.setZeroCrossingOn(true);
+  Muses.mute();
   // Load saved settings (volume, balance, source)
   preferences.begin("settings", RW_MODE);
   source = preferences.getUInt("SOURCE", 1);
-  volume = preferences.getUInt("VOLUME", 15);
-  //printLocalTime();
+  volume = preferences.getInt("VOLUME", -447);
+  printLocalTime();
   delay(10);
   // set startup volume
   setVolume();
@@ -915,13 +944,11 @@ void setup()
   setIO();
   // unmute
   isMuted = 0;
-  preamp.mas6116Mute(HIGH);
 }
 
 void loop()
 {
-  //ElegantOTA.loop();
   RC5Update();
   RotaryUpdate();
-  //printLocalTime();
+  printLocalTime();
 }

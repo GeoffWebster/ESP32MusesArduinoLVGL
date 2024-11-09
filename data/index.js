@@ -60,14 +60,28 @@ function onMessage(event) {
 // ----------------------------------------------------------------------------
 
 function initButton() {
-    document.getElementById('ipSelect').addEventListener('click', onSelect);
+    document.getElementById('phono').addEventListener('click', onPhono);
+    document.getElementById('media').addEventListener('click', onMedia);
+    document.getElementById('cd').addEventListener('click', onCD);
+    document.getElementById('tuner').addEventListener('click', onTuner);
     document.getElementById('voldown').addEventListener('click', onVoldown);
     document.getElementById('volup').addEventListener('click', onVolup);
     document.getElementById('mute').addEventListener('click', onMute);
 }
 
-function onSelect(event) {
-    websocket.send(JSON.stringify({'Select':'toggle'}));
+function onPhono(event) {
+    websocket.send(JSON.stringify({'Phono':'toggle'}));
+}
+
+function onMedia(event) {
+    websocket.send(JSON.stringify({'Media':'toggle'}));
+}
+
+function onCD(event) {
+    websocket.send(JSON.stringify({'CD':'toggle'}));
+}
+function onTuner(event) {
+    websocket.send(JSON.stringify({'Tuner':'toggle'}));
 }
 
 function onVoldown(event) {
