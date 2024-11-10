@@ -54,11 +54,7 @@ h1 {
 }
 
 #volume::before {
-  content: "Atten: ";
-}
-
-#volume::after {
-  content:" dB";
+  content: "Vol: ";
 }
 
 #muted {

@@ -121,7 +121,7 @@ unsigned long milOnFadeIn;  // LCD fade timing
 unsigned long milOnFadeOut; // LCD fade timing
 
 /********* Global Variables *******************/
-float atten;     // current attenuation, between 0 and -111.75
+// float atten;     // current attenuation, between 0 and -111.75
 int16_t volume; // current volume, between 0 and -447
 bool backlight;  // current backlight state
 uint16_t counter = 0;
@@ -149,6 +149,7 @@ volatile bool turnedLeftFlag = false;
 
 char buffer1[20] = "";
 char buffer2[20] = "";
+char buffer3[8] = "";
 
 // Global Constants
 //------------------
