@@ -42,8 +42,10 @@ function onClose(event) {
 
 function onMessage(event) {
     let data = JSON.parse(event.data);
+    let z = data.volume / 4;
+    let a = z.toFixed(2);
     document.getElementById('source').innerHTML = data.source;
-    document.getElementById('volume').innerHTML = data.volume;
+    document.getElementById('volume').innerHTML = a;
     if (data.mute == "off")
     {
         document.getElementById('volume').className = "off";

@@ -123,7 +123,7 @@ unsigned long milOnFadeOut; // LCD fade timing
 /********* Global Variables *******************/
 // float atten;     // current attenuation, between 0 and -111.75
 int16_t volume; // current volume, between 0 and -447
-bool backlight;  // current backlight state
+bool backlight; // current backlight state
 uint16_t counter = 0;
 uint8_t source;        // current input channel
 uint8_t oldsource = 1; // previous input channel
@@ -243,17 +243,17 @@ void initTime(String timezone)
   struct tm timeinfo;
   tft.drawString("Setting up time", 160, 160, 1);
 
-  //Serial.println("Setting up time");
+  // Serial.println("Setting up time");
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // First connect to NTP server, with 0 TZ offset
   if (!getLocalTime(&timeinfo))
   {
     tft.drawString("Failed to obtain time", 160, 160, 1);
-    //Serial.println("  Failed to obtain time");
+    // Serial.println("  Failed to obtain time");
     return;
   }
   tft.drawString("Got NTP Server time", 160, 160, 1);
-  //Serial.println("  Got the time from NTP");
-  // Now we can set the real timezone
+  // Serial.println("  Got the time from NTP");
+  //  Now we can set the real timezone
   setTimezone(timezone);
   delay(500);
 }
@@ -271,7 +271,7 @@ void setTime(int yr, int month, int mday, int hr, int minute, int sec, int isDst
   tm.tm_isdst = isDst; // 1 or 0
   time_t t = mktime(&tm);
   tft.drawString("Setting time", 160, 160, 1);
-  //Serial.printf("Setting time: %s", asctime(&tm));
+  // Serial.printf("Setting time: %s", asctime(&tm));
   struct timeval now = {.tv_sec = t};
   settimeofday(&now, NULL);
 }
@@ -282,7 +282,7 @@ void printLocalTime()
   if (!getLocalTime(&timeinfo))
   {
     tft.drawString("Failed to obtain time", 160, 160, 1);
-    //Serial.println("Failed to obtain time");
+    // Serial.println("Failed to obtain time");
     return;
   }
   currentSeconds = timeinfo.tm_sec;
@@ -300,9 +300,11 @@ void printLocalTime()
 
 void initLittleFS()
 {
-  if (!LittleFS.begin()) {
+  if (!LittleFS.begin())
+  {
     Serial.println("Flash FS initialisation failed!");
-    while (1) yield(); // Stay here twiddling thumbs waiting
+    while (1)
+      yield(); // Stay here twiddling thumbs waiting
   }
   Serial.println("\nFlash FS available!");
 }
@@ -393,8 +395,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       Serial.println(err.c_str());
       return;
     }
- 
-   if (json["Phono"])
+
+    if (json["Phono"])
     {
       const char *sel = json["Phono"];
       if (strcmp(sel, "toggle") == 0)
@@ -892,9 +894,11 @@ void setup()
 
   initLittleFS();
   initWiFi();
-  if (!MDNS.begin("esp32HiFi")) {
+  if (!MDNS.begin("esp32HiFi"))
+  {
     Serial.println("Error setting up MDNS responder!");
-    while (1) {
+    while (1)
+    {
       delay(1000);
     }
   }
@@ -908,7 +912,7 @@ void setup()
   // Set text datum to middle centre
   tft.setTextDatum(MC_DATUM);
   tft.setFreeFont(FSS18);
-  
+
   // Clear the screen
   tft.fillScreen(TFT_WHITE);
   // show software version briefly in display
@@ -917,9 +921,12 @@ void setup()
   tft.drawString(softTitle1, 160, 80, 1);
   tft.drawString(softTitle2, 160, 120, 1);
   tft.drawString("SW ver " VERSION_NUM, 160, 160, 1);
-    delay(2000);
+  delay(2000);
+
+/*
   // Init and get the time
   initTime("GMT0BST,M3.5.0/1,M10.4.0"); // Set for Europe / London
+*/
 
   tft.setFreeFont(FSS24);
   tft.fillScreen(TFT_WHITE);
@@ -937,7 +944,8 @@ void setup()
   preferences.begin("settings", RW_MODE);
   source = preferences.getUInt("SOURCE", 1);
   volume = preferences.getInt("VOLUME", -447);
-  printLocalTime();
+  /*printLocalTime();
+  */
   delay(10);
   // set startup volume
   setVolume();
@@ -951,5 +959,5 @@ void loop()
 {
   RC5Update();
   RotaryUpdate();
-  printLocalTime();
+  // printLocalTime();
 }

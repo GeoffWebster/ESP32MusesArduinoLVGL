@@ -20,7 +20,6 @@ The 320x240 TFT display with an SPI interface provides visual data for source in
 
 Additional functionality is provided by use of the ESP32's built-in peripherals. These are
 * WiFi remote control of volume, source selection and mute
-* Clock (locked to internet NTP server)
 * OTA software update capability
 
 Code Libraries
