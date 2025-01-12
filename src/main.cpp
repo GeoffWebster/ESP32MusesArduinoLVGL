@@ -458,11 +458,10 @@ void RotaryUpdate()
     break;
   case STATE_IO:
     sourceUpdate();
-    /*
     if ((millis() - milOnButton) > TIME_EXITSELECT * 1000)
     {
       state = STATE_RUN;
-    }*/
+    }
     break;
   default:
     break;

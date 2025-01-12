@@ -11,7 +11,7 @@ This is an application for controlling a stereo audio preamplifier. Items covere
 An ESP32-DevKitC V4 interfaces through a motherboard with on-board rotary encoder, IR receiver and 320x240 TFT display. 
 External interfaces connect to
 *   source select relay board and
-M*   balanced digital volume controller / preamplifier board (based on Bruno Putzeys balanced pre-amp with an integrated Muses72323 digital volume control chip).
+*   balanced digital volume controller / preamplifier board (based on Bruno Putzeys balanced pre-amp with an integrated Muses72323 digital volume control chip).
 
 The Quadrature rotary encoder/switch (PEC11R) provides control of the volume as the default mode. Pressing the encoder shaft button switches over to SOURCE SELECT mode and this remains as the active mode till rotary encoder turning is inactive for longer than the TIME_EXITSELECT value (in seconds).
 
