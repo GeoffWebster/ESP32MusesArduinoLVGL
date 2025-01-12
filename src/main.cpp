@@ -6,17 +6,7 @@
 #include <RC5.h>
 #include <Muses72323.h> // Hardware-specific library
 #include <ESP32RotaryEncoder.h>
-#include <MCP23S08.h>   // Hardware-specific library
-<<<<<<< HEAD
-=======
-#include "Free_Fonts.h" // Include the Free fonts header file
-
-// Current software
-#define softTitle1 "ESP32/TFT/lvgl"
-#define softTitle2 "Muses72323 Controller"
-// version number
-#define VERSION_NUM "1.0"
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
+#include <MCP23S08.h> // Hardware-specific library
 
 /******* MACHINE STATES *******/
 #define STATE_RUN 0 // normal run state
@@ -54,37 +44,21 @@ static Muses72323 Muses(MUSES_ADDRESS, s_select_72323); // muses chip address (u
 // define encoder pins
 const uint8_t DI_ENCODER_A = 33;
 const uint8_t DI_ENCODER_B = 32;
-<<<<<<< HEAD
 const int8_t DI_ENCODER_SW = 12;
 
 /********* Global Variables *******************/
 
 float atten;           // current attenuation, between 0 and -111.75
 int16_t volume = -447; // current volume, between 0 and -447
-bool backlight;        // current backlight state
+int16_t oldvolume = -447;
+bool backlight; // current backlight state
 uint16_t counter = 0;
 uint8_t source;        // current input channel
-=======
-const int8_t DI_ENCODER_SW = 14;
-
-/********* Global Variables *******************/
-
-float atten;              // current attenuation, between 0 and -111.75
-int16_t oldvolume = -447; // current volume, between 0 and -447
-int16_t volume = -447;    // current volume, between 0 and -447
-bool backlight;           // current backlight state
-int16_t counter = 0;
-uint8_t source = 1;    // current input channel
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
 uint8_t oldsource = 1; // previous input channel
 bool isMuted;          // current mute status
 uint8_t state = 0;     // current machine state
 bool btnstate = 0;
 bool oldbtnstate = 0;
-<<<<<<< HEAD
-=======
-int splashcount;
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
 
 /*System addresses and codes used here match RC-5 infra-red codes for amplifiers (and CDs)*/
 uint16_t oldtoggle;
@@ -116,12 +90,8 @@ unsigned long milOnAction; // Stores last time of user input
 
 // Function prototypes
 void log_print(lv_log_level_t level, const char *buf);
-<<<<<<< HEAD
 void RC5Update(void);
 void setIO();
-=======
-void setIO(void *text_label_source, int32_t v);
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
 void knobCallback(long value);
 void buttonCallback(unsigned long duration);
 void volumeUpdate();
@@ -131,13 +101,6 @@ void RC5Update(void);
 void unMute();
 void mute();
 void toggleMute();
-<<<<<<< HEAD
-=======
-void RotaryUpdate();
-void setIO(void *text_label_source, int32_t v);
-void lv_create_splash_screen(void);
-void lv_create_main_gui(void);
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
 
 #define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];
@@ -221,15 +184,11 @@ void volumeUpdate()
     }
     if (volume < 0)
     {
-<<<<<<< HEAD
-      volume = volume + 1;
-=======
       volume = volume + counter;
-    }
-    if (volume > 0)
-    {
-      volume = 0;
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
+      if (volume > 0)
+      {
+        volume = 0;
+      }
     }
     // Set flag back to false so we can watch for the next move
     turnedRightFlag = false;
@@ -242,15 +201,11 @@ void volumeUpdate()
     }
     if (volume > -447)
     {
-<<<<<<< HEAD
-      volume = volume - 1;
-=======
-      volume = volume + counter;
-    }
-    if (volume < -447)
-    {
-      volume - -447;
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
+      volume = volume - counter;
+      if (volume < -447)
+      {
+        volume = -447;
+      }
     }
     // Set flag back to false so we can watch for the next move
     turnedLeftFlag = false;
@@ -264,38 +219,24 @@ lv_obj_t *arc;
 // Set the volume value in the bar and text label
 static void set_volume(void *text_label_vol_value, int32_t v)
 {
-<<<<<<< HEAD
-  Muses.setVolume(volume, volume);
-  preferences.putInt("VOLUME", volume);
-  // display volume setting
-  if (!backlight)
-=======
-  // Don't send MUSES72323 data if no change to volume
-  if (oldvolume != volume)
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
+  if (volume != oldvolume)
   {
     Muses.setVolume(volume, volume);
     preferences.putInt("VOLUME", volume);
     oldvolume = volume;
-    // Turn on display if volume changed
-    if (!backlight)
-    {
-      backlight = ACTIVE;
-      digitalWrite(TFT_BL, HIGH); // Turn on backlight
-    }
+  }
+  // display volume setting
+  if (!backlight)
+  // Turn on display if volume changed
+  {
+    backlight = ACTIVE;
+    digitalWrite(TFT_BL, HIGH); // Turn on backlight
   }
   float amp_vol = ((float)volume / 4);
-<<<<<<< HEAD
   lv_obj_set_style_text_color((lv_obj_t *)text_label_vol_value, lv_palette_main(LV_PALETTE_INDIGO), 0);
   const char dB_symbol[] = "dB";
   lv_arc_set_value(arc, amp_vol);
   String amp_vol_text = String(amp_vol) + dB_symbol;
-=======
-  int amp_vol_int = volume / 4;
-  const char dB_symbol[] = "dB";
-  lv_arc_set_value(arc, float(amp_vol));
-  String amp_vol_text = String(amp_vol_int) + dB_symbol;
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
   lv_label_set_text((lv_obj_t *)text_label_vol_value, isMuted ? "Muted" : amp_vol_text.c_str());
 }
 
@@ -314,15 +255,7 @@ void sourceUpdate()
       source = 1;
     }
     if (isMuted)
-    {
-      if (!backlight)
-      {
-        backlight = ACTIVE;
-        digitalWrite(TFT_BL, HIGH);
-      }
-      isMuted = 0;
-      Muses.setVolume(volume, volume);
-    }
+      unMute();
     // Set flag back to false so we can watch for the next move
     turnedRightFlag = false;
   }
@@ -339,15 +272,7 @@ void sourceUpdate()
       source = 4;
     }
     if (isMuted)
-    {
-      if (!backlight)
-      {
-        backlight = ACTIVE;
-        digitalWrite(TFT_BL, HIGH);
-      }
-      isMuted = 0;
-      Muses.setVolume(volume, volume);
-    }
+      unMute();
     // Set flag back to false so we can watch for the next move
     turnedLeftFlag = false;
   }
@@ -546,7 +471,6 @@ void RotaryUpdate()
 
 void setIO(void *text_label_source, int32_t v)
 {
-<<<<<<< HEAD
   MCP.write1((oldsource - 1), LOW); // Reset source select to NONE
   MCP.write1((source - 1), HIGH);   // Set new source
   preferences.putUInt("SOURCE", source);
@@ -555,56 +479,6 @@ void setIO(void *text_label_source, int32_t v)
 
 void lv_create_main_gui(void)
 {
-=======
-  if (oldsource != source)
-  {
-    MCP.write1((oldsource - 1), LOW); // Reset source select to NONE
-    MCP.write1((source - 1), HIGH);   // Set new source
-    preferences.putUInt("SOURCE", source);
-    //oldsource = source;
-  }
-  lv_label_set_text((lv_obj_t *)text_label_source, inputName[source - 1]);
-}
-
-static void splash_screen_cb(void *lv_screen_active, int32_t v)
-{
-  if (millis() > (splashcount + 3000))
-  lv_create_main_gui();
-  MCP.write1((source - 1), HIGH);  // Set source
-  Muses.setVolume(volume, volume); // Set volume
-  isMuted = 0;
-}
-
-void lv_create_splash_screen(void)
-{
-  lv_obj_t *header1 = lv_label_create(lv_screen_active());
-  lv_label_set_text(header1, softTitle1);
-  lv_obj_align(header1, LV_ALIGN_CENTER, 0, -30);
-  lv_obj_t *header2 = lv_label_create(lv_screen_active());
-  lv_label_set_text(header2, softTitle2);
-  lv_obj_align(header2, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_t *header3 = lv_label_create(lv_screen_active());
-  lv_label_set_text(header3, "version " VERSION_NUM);
-  lv_obj_align(header3, LV_ALIGN_CENTER, 0, 30);
-  lv_obj_set_style_text_font(header1, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_font(header2, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_font(header3, &lv_font_montserrat_24, 0);
-  splashcount = millis();
-
-  //Create an animation to close splash screen and create main GUI
-  lv_anim_t splash;
-  lv_anim_init(&splash);
-  lv_anim_set_exec_cb(&splash, splash_screen_cb );
-  lv_anim_set_duration(&splash, 4000);
-  lv_anim_set_var(&splash, header1);
-  lv_anim_set_values(&splash, 0, 100);
-  lv_anim_start(&splash);
-}
-
-void lv_create_main_gui(void)
-{
-  lv_obj_clean(lv_scr_act());
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
   // Create a text label to display the current Source
   lv_obj_t *text_label_source = lv_label_create(lv_screen_active());
   lv_label_set_text(text_label_source, "Phono");
@@ -612,15 +486,9 @@ void lv_create_main_gui(void)
   lv_obj_align(text_label_source, LV_ALIGN_CENTER, 0, -80);
   static lv_style_t style_source;
   lv_style_init(&style_source);
-<<<<<<< HEAD
   lv_style_set_text_font(&style_source, &lv_font_montserrat_42);
   lv_obj_add_style(text_label_source, &style_source, 0);
   // Create an animation to update the text label with the latest source value every 10 seconds
-=======
-  lv_style_set_text_font(&style_source, &lv_font_montserrat_48);
-  lv_obj_add_style(text_label_source, &style_source, 0);
-  // Create an animation to update the text label with the latest source value every 10 milli-seconds
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
   lv_anim_t a_source;
   lv_anim_init(&a_source);
   lv_anim_set_exec_cb(&a_source, setIO);
@@ -634,7 +502,6 @@ void lv_create_main_gui(void)
   // Create an Arc
   arc = lv_arc_create(lv_screen_active());
   lv_obj_set_size(arc, 210, 210);
-<<<<<<< HEAD
   lv_arc_set_rotation(arc, 180);
   lv_arc_set_bg_angles(arc, -30, 210);
   lv_arc_set_range(arc, TEMP_ARC_MIN, TEMP_ARC_MAX);
@@ -653,31 +520,7 @@ void lv_create_main_gui(void)
   lv_style_set_text_font(&style_vol, &lv_font_montserrat_32);
   lv_obj_add_style(text_label_vol_value, &style_vol, 0);
 
-  // Create an animation to update the text label with the latest temperature value every 10 seconds
-=======
-  lv_arc_set_rotation(arc, 160);
-  lv_arc_set_bg_angles(arc, 0, 220);
-  lv_arc_set_range(arc, TEMP_ARC_MIN, TEMP_ARC_MAX);
-  lv_obj_set_style_bg_color(arc, lv_color_hex(0xffff00), LV_PART_INDICATOR);
-  lv_obj_set_style_arc_color(arc, lv_color_hex(0x0000ff), LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(arc, lv_color_hex(0x0000ff), LV_PART_KNOB);
-  lv_obj_align(arc, LV_ALIGN_CENTER, 0, 60);
-
-  // Create a text label in font size 48 to display the current volume
-  lv_obj_t *text_label_vol_value = lv_label_create(lv_screen_active());
-  lv_label_set_text(text_label_vol_value, "--.--");
-
-  lv_obj_set_style_text_align(text_label_vol_value, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_color((lv_obj_t *)text_label_vol_value, lv_palette_main(LV_PALETTE_BLUE), 0);
-  lv_obj_align(text_label_vol_value, LV_ALIGN_CENTER, 0, 80);
-
-  static lv_style_t style_vol;
-  lv_style_init(&style_vol);
-  lv_style_set_text_font(&style_vol, &lv_font_montserrat_48);
-  lv_obj_add_style(text_label_vol_value, &style_vol, 0);
-
-  // Create an animation to update the text label with the latest temperature value every 10 milli-seconds
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
+  // Create an animation to update the text label with the latest volume value every 10 seconds
   lv_anim_t a_vol;
   lv_anim_init(&a_vol);
   lv_anim_set_exec_cb(&a_vol, set_volume);
@@ -738,18 +581,9 @@ void setup()
   // Initialize the TFT display using the TFT_eSPI library
   disp = lv_tft_espi_create(SCREEN_WIDTH, SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
   lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
-<<<<<<< HEAD
   // Function to draw the GUI
   isMuted = 1;
   lv_create_main_gui();
-=======
-
-  // set the volume and source to stored values
-  oldsource = source;
-  oldvolume = volume;
-  lv_create_splash_screen();
-  isMuted = 1;
->>>>>>> 0c121cf88f444a5154308dc15444367c3999609e
 }
 
 void loop()
