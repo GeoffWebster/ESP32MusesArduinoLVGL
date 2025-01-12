@@ -1,63 +1,12 @@
-/* ESP32 +TFT Pre-amp Controller with WiFi
-*********************
-
-Author Geoff Webster
-
-ESP32/TFT + Wifi Current Ver 3.0   4 November 2024
-- Removal of mas6116 volume controller routines
-- Replace with MUSES72323 volume controller routines
-
-ESP32/TFT + Wifi Current Ver 2.0  15 February 2024
-- Addition of Web OTA function (uses ElegantOTA library)
-- Correction of setIO and sourceUpdate routines to ensure Web interface indicates current selected source
-- Addition of WiFi remote control for volume, source and mute
-- Addition of clock display
-- Amended setVolume routine to display atten/gain (-112dB min to +15.5dB). Previously displayed 0 -255.
-
-ESP32/TFT + Wifi version 1.0 11 February 2024
-- Migrated from Arduino + 4x20 LCD version to ESP32 microcontroller and 320x240 TFT colour display.
-- Addition of WiFi remote control
-- Amended RC coding for backlight so only toggles backlight (leaving source, volume and mute unchanged)
-- Replaced original rotary encoder library with ESP32RotaryEncoder library
-- Addition of KnobCallback and ButtonCallback routines to interface with new encoder library and
-- Amended VolumeUpdate and sourceUpdate procedures to use above new rotary routines
-- Deleted balance function
-
-Arduino + 4x20 LCD version 3.0 Date	14 July 2023
-- Changed mas6116::mas6116 construct in mas6116.cpp so that MUTE pin is initialized LOW
-  Ensures MUTE remains LOW for two seconds after power startup
-
-Arduino + 4x20 LCD version 2.0 Date	27 April 2022
-- Changed mute pin to match new Controller board v2.0 (mutePin = 9). Mute pin used previously was A2 (on Ver 1.0 board)
-- Added code to setup() routine which displays the SW version for two seconds at startup
-
-*/
-
 #include <Arduino.h>
+#include <lvgl.h>
 #include <Preferences.h>
 #include <SPI.h>
 #include <TFT_eSPI.h> // Hardware-specific library
 #include <RC5.h>
-#include <muses72323.h> // Hardware-specific library
+#include <Muses72323.h> // Hardware-specific library
 #include <ESP32RotaryEncoder.h>
-#include <MCP23S08.h> // Hardware-specific library
-#include <LittleFS.h>
-#include <FS.h>
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include "time.h"
-#include <ESPAsyncWebServer.h>
-#include <ElegantOTA.h>
-#include <AsyncTCP.h>
-#include <ArduinoJson.h>
-#include "Free_Fonts.h" // Include the Free fonts header file
-#define FlashFS LittleFS
-
-// Current software
-#define softTitle1 "ESP32/TFT"
-#define softTitle2 "Pre-amp Controller"
-// version number
-#define VERSION_NUM "3.0"
+#include <MCP23S08.h>   // Hardware-specific library
 
 /******* MACHINE STATES *******/
 #define STATE_BALANCE 1 // when user adjusts balance
@@ -80,8 +29,6 @@ Preferences preferences;
 // 23S08 Construct
 MCP23S08 MCP(10); //  HW SPI address 0x00, CS GPIO10
 
-TFT_eSPI tft = TFT_eSPI(); // Invoke custom library
-
 // define IR input
 unsigned int IR_PIN = 27;
 // RC5 construct
@@ -100,40 +47,18 @@ const uint8_t DI_ENCODER_A = 33;
 const uint8_t DI_ENCODER_B = 32;
 const int8_t DI_ENCODER_SW = 12;
 
-// Network credentials
-const char *ssid = "PLUSNET-9FC9NQ";
-const char *password = "M93ucVcxRGCKeR";
-
-// Web Server / WebSocket constructs
-
-#define HTTP_PORT 80
-
-AsyncWebServer server(HTTP_PORT);
-AsyncWebSocket ws("/ws");
-
-// Rotary construct
-RotaryEncoder rotaryEncoder(DI_ENCODER_A, DI_ENCODER_B, DI_ENCODER_SW);
-
-/******* TIMING *******/
-unsigned long milOnButton;  // Stores last time for switch press
-unsigned long milOnAction;  // Stores last time of user input
-unsigned long milOnFadeIn;  // LCD fade timing
-unsigned long milOnFadeOut; // LCD fade timing
-
 /********* Global Variables *******************/
-// float atten;     // current attenuation, between 0 and -111.75
-int16_t volume; // current volume, between 0 and -447
-bool backlight; // current backlight state
+
+float atten;           // current attenuation, between 0 and -111.75
+int16_t volume = -447; // current volume, between 0 and -447
+bool backlight;        // current backlight state
 uint16_t counter = 0;
 uint8_t source;        // current input channel
 uint8_t oldsource = 1; // previous input channel
 bool isMuted;          // current mute status
 uint8_t state = 0;     // current machine state
-uint8_t balanceState;  // current balance state
 bool btnstate = 0;
 bool oldbtnstate = 0;
-int lastSeconds = 0;    // last seconds
-int currentSeconds = 0; // current seconds
 
 /*System addresses and codes used here match RC-5 infra-red codes for amplifiers (and CDs)*/
 uint16_t oldtoggle;
@@ -148,380 +73,52 @@ volatile bool turnedRightFlag = false;
 volatile bool turnedLeftFlag = false;
 
 char buffer1[20] = "";
-char buffer2[20] = "";
-char buffer3[8] = "";
 
 // Global Constants
 //------------------
-const char *inputName[] = {"  Phono ", "   Media  ", "     CD    ", "   Tuner  "}; // Elektor i/p board
-const int source_size = 6;
-const int volume_size = 6;
-const int source_x = 100;
-const int source_y = 10;
-const int volume_x = 100;
-const int volume_y = 100;
+const char *inputName[] = {"Phono", "Media", "CD", "Tuner"}; // Elektor i/p board
 
-const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 0;
-const int daylightOffset_sec = 3600;
+// Rotary construct
+RotaryEncoder rotaryEncoder(DI_ENCODER_A, DI_ENCODER_B, DI_ENCODER_SW);
+
+/******* TIMING *******/
+unsigned long milOnButton; // Stores last time for switch press
+unsigned long milOnAction; // Stores last time of user input
+
+#define SCREEN_WIDTH 240
+#define SCREEN_HEIGHT 320
 
 // Function prototypes
+void log_print(lv_log_level_t level, const char *buf);
 void RC5Update(void);
 void setIO();
 void knobCallback(long value);
 void buttonCallback(unsigned long duration);
 void RotaryUpdate();
 void volumeUpdate();
-void setVolume();
+static void set_volume(void *text_label_vol_value, int32_t v);
 void sourceUpdate();
 void mute();
 void unMute();
 void toggleMute();
-void initLittleFS(void);
-void initWiFi(void);
-String processor(const String &var);
-void onRootRequest(AsyncWebServerRequest *request);
-void initWebServer(void);
-void notifyClients(void);
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len);
-void onEvent(AsyncWebSocket *server,
-             AsyncWebSocketClient *client,
-             AwsEventType type,
-             void *arg,
-             uint8_t *data,
-             size_t len);
-void initWebSocket(void);
-void printLocalTime(void);
-void setTimezone(String timezone);
-void setTime(int yr, int month, int mday, int hr, int minute, int sec, int isDst);
-void initTime(String timezone);
-void onOTAStart();
-void onOTAProgress(size_t current, size_t final);
-void onOTAEnd(bool success);
 
-unsigned long ota_progress_millis = 0;
+#define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
+uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
-void onOTAStart()
+// If logging is enabled, it will inform the user about what is happening in the library
+void log_print(lv_log_level_t level, const char *buf)
 {
-  // Log when OTA has started
-  Serial.println("OTA update started!");
-  // <Add your own code here>
-}
-
-void onOTAProgress(size_t current, size_t final)
-{
-  // Log every 1 second
-  if (millis() - ota_progress_millis > 1000)
-  {
-    ota_progress_millis = millis();
-    Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
-  }
-}
-
-void onOTAEnd(bool success)
-{
-  // Log when OTA has finished
-  if (success)
-  {
-    Serial.println("OTA update finished successfully!");
-  }
-  else
-  {
-    Serial.println("There was an error during OTA update!");
-  }
-}
-
-void setTimezone(String timezone)
-{
-  Serial.printf("  Setting Timezone to %s\n", timezone.c_str());
-  setenv("TZ", timezone.c_str(), 1); //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
-  tzset();
-}
-
-void initTime(String timezone)
-{
-  struct tm timeinfo;
-  tft.drawString("Setting up time", 160, 160, 1);
-
-  // Serial.println("Setting up time");
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // First connect to NTP server, with 0 TZ offset
-  if (!getLocalTime(&timeinfo))
-  {
-    tft.drawString("Failed to obtain time", 160, 160, 1);
-    // Serial.println("  Failed to obtain time");
-    return;
-  }
-  tft.drawString("Got NTP Server time", 160, 160, 1);
-  // Serial.println("  Got the time from NTP");
-  //  Now we can set the real timezone
-  setTimezone(timezone);
-  delay(500);
-}
-
-void setTime(int yr, int month, int mday, int hr, int minute, int sec, int isDst)
-{
-  struct tm tm;
-
-  tm.tm_year = yr - 1900; // Set date
-  tm.tm_mon = month - 1;
-  tm.tm_mday = mday;
-  tm.tm_hour = hr; // Set time
-  tm.tm_min = minute;
-  tm.tm_sec = sec;
-  tm.tm_isdst = isDst; // 1 or 0
-  time_t t = mktime(&tm);
-  tft.drawString("Setting time", 160, 160, 1);
-  // Serial.printf("Setting time: %s", asctime(&tm));
-  struct timeval now = {.tv_sec = t};
-  settimeofday(&now, NULL);
-}
-
-void printLocalTime()
-{
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo))
-  {
-    tft.drawString("Failed to obtain time", 160, 160, 1);
-    // Serial.println("Failed to obtain time");
-    return;
-  }
-  currentSeconds = timeinfo.tm_sec;
-  if (lastSeconds != currentSeconds)
-  {
-    lastSeconds = currentSeconds;
-    strftime(buffer1, 20, "  %H:%M:%S  ", &timeinfo);
-    tft.drawString(buffer1, 160, 40, 1);
-  }
-}
-
-// ----------------------------------------------------------------------------
-// LittleFS initialization
-// ----------------------------------------------------------------------------
-
-void initLittleFS()
-{
-  if (!LittleFS.begin())
-  {
-    Serial.println("Flash FS initialisation failed!");
-    while (1)
-      yield(); // Stay here twiddling thumbs waiting
-  }
-  Serial.println("\nFlash FS available!");
-}
-
-// ----------------------------------------------------------------------------
-// Connecting to the WiFi network
-// ----------------------------------------------------------------------------
-
-void initWiFi()
-{
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.printf("Trying to connect [%s] ", WiFi.macAddress().c_str());
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print(".");
-    delay(500);
-  }
-  Serial.printf(" %s\n", WiFi.localIP().toString().c_str());
-}
-
-// ----------------------------------------------------------------------------
-// Web server initialization
-// ----------------------------------------------------------------------------
-String processor(const String &var)
-{
-  if (var == "VOLUME")
-  {
-    return String(volume);
-  }
-  if (var == "SOURCE")
-  {
-    return String(inputName[source - 1]);
-  }
-  if (var == "STATE1")
-  {
-    return String(String(var == "STATE1" && isMuted ? "on" : "off"));
-  }
-  if (var == "STATE2")
-  {
-    return String(String(var == "STATE2" && isMuted ? "off" : "on"));
-  }
-  return String();
-}
-
-void onRootRequest(AsyncWebServerRequest *request)
-{
-  request->send(LittleFS, "/index.html", "text/html", false, processor);
-}
-
-void initWebServer()
-{
-  server.on("/", onRootRequest);
-  server.serveStatic("/", LittleFS, "/");
-  ElegantOTA.begin(&server); // Start ElegantOTA
-  // ElegantOTA callbacks
-  ElegantOTA.onStart(onOTAStart);
-  ElegantOTA.onProgress(onOTAProgress);
-  ElegantOTA.onEnd(onOTAEnd);
-  server.begin();
-}
-
-// ----------------------------------------------------------------------------
-// WebSocket initialization
-// ----------------------------------------------------------------------------
-
-void notifyClients()
-{
-  JsonDocument json;
-  json["source"] = inputName[source - 1];
-  json["volume"] = volume;
-  json["mute"] = isMuted ? "on" : "off";
-  char buffer[60];
-  size_t len = serializeJson(json, buffer);
-  ws.textAll(buffer, len);
-}
-
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
-{
-  AwsFrameInfo *info = (AwsFrameInfo *)arg;
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
-  {
-    JsonDocument json;
-    DeserializationError err = deserializeJson(json, data);
-    if (err)
-    {
-      Serial.print(F("deserializeJson() failed with code "));
-      Serial.println(err.c_str());
-      return;
-    }
-
-    if (json["Phono"])
-    {
-      const char *sel = json["Phono"];
-      if (strcmp(sel, "toggle") == 0)
-      {
-        oldsource = source;
-        source = 1;
-        setIO();
-      }
-    }
-    else if (json["Media"])
-    {
-      const char *sel = json["Media"];
-      if (strcmp(sel, "toggle") == 0)
-      {
-        oldsource = source;
-        source = 2;
-        setIO();
-      }
-    }
-    else if (json["CD"])
-    {
-      const char *sel = json["CD"];
-      if (strcmp(sel, "toggle") == 0)
-      {
-        oldsource = source;
-        source = 3;
-        setIO();
-      }
-    }
-    else if (json["Tuner"])
-    {
-      const char *sel = json["Tuner"];
-      if (strcmp(sel, "toggle") == 0)
-      {
-        oldsource = source;
-        source = 4;
-        setIO();
-      }
-    }
-    else if (json["Volup"])
-    {
-      const char *vol = json["Volup"];
-      if (strcmp(vol, "toggle") == 0)
-      {
-        if (isMuted)
-        {
-          unMute();
-        }
-        if (volume < 0)
-        {
-          volume = volume + 1;
-          setVolume();
-        }
-      }
-    }
-    else if (json["Voldown"])
-    {
-      const char *vol = json["Voldown"];
-      if (strcmp(vol, "toggle") == 0)
-      {
-        if (isMuted)
-        {
-          unMute();
-        }
-        if (volume > -447)
-        {
-          volume = volume - 1;
-          setVolume();
-        }
-      }
-    }
-    else if (json["Mute"])
-    {
-      const char *mut = json["Mute"];
-      if (strcmp(mut, "toggle") == 0)
-      {
-        toggleMute();
-      }
-    }
-  }
-}
-
-void onEvent(AsyncWebSocket *server,
-             AsyncWebSocketClient *client,
-             AwsEventType type,
-             void *arg,
-             uint8_t *data,
-             size_t len)
-{
-
-  switch (type)
-  {
-  case WS_EVT_CONNECT:
-    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-    break;
-  case WS_EVT_DISCONNECT:
-    Serial.printf("WebSocket client #%u disconnected\n", client->id());
-    break;
-  case WS_EVT_DATA:
-    handleWebSocketMessage(arg, data, len);
-    break;
-  case WS_EVT_PONG:
-  case WS_EVT_ERROR:
-    break;
-  }
-}
-
-void initWebSocket()
-{
-  ws.onEvent(onEvent);
-  server.addHandler(&ws);
+  LV_UNUSED(level);
+  Serial.println(buf);
+  Serial.flush();
 }
 
 void knobCallback(long value)
 {
-  // See the note in the `loop()` function for
-  // an explanation as to why we're setting
-  // boolean values here instead of running
-  // functions directly.
-
   // Don't do anything if either flag is set;
   // it means we haven't taken action yet
   if (turnedRightFlag || turnedLeftFlag)
     return;
-
   // Set a flag that we can look for in `loop()`
   // so that we know we have something to do
   switch (value)
@@ -534,7 +131,6 @@ void knobCallback(long value)
     turnedLeftFlag = true;
     break;
   }
-
   // Override the tracked value back to 0 so that
   // we can continue tracking right/left events
   rotaryEncoder.setEncoderValue(0);
@@ -568,7 +164,6 @@ void volumeUpdate()
     if (volume < 0)
     {
       volume = volume + 1;
-      setVolume();
     }
     // Set flag back to false so we can watch for the next move
     turnedRightFlag = false;
@@ -579,19 +174,22 @@ void volumeUpdate()
     {
       unMute();
     }
-    if (volume != 447)
+    if (volume > -447)
     {
       volume = volume - 1;
-      setVolume();
     }
     // Set flag back to false so we can watch for the next move
     turnedLeftFlag = false;
   }
 }
 
-void setVolume()
+#define TEMP_ARC_MIN -112
+#define TEMP_ARC_MAX 0
+lv_obj_t *arc;
+
+// Set the volume value in the bar and text label
+static void set_volume(void *text_label_vol_value, int32_t v)
 {
-  // set new volume setting
   Muses.setVolume(volume, volume);
   preferences.putInt("VOLUME", volume);
   // display volume setting
@@ -600,14 +198,12 @@ void setVolume()
     backlight = ACTIVE;
     digitalWrite(TFT_BL, HIGH); // Turn on backlight
   }
-  float atten = ((float)volume / 4);
-  sprintf(buffer2, "  %.2fdB  ", atten);
-  tft.setTextSize(2);
-  tft.setFreeFont(FSS18);
-  tft.drawString(buffer2, 150, 120, 1);
-  tft.setTextSize(1);
-  tft.setFreeFont(FSS24);
-  notifyClients();
+  float amp_vol = ((float)volume / 4);
+  lv_obj_set_style_text_color((lv_obj_t *)text_label_vol_value, lv_palette_main(LV_PALETTE_INDIGO), 0);
+  const char dB_symbol[] = "dB";
+  lv_arc_set_value(arc, amp_vol);
+  String amp_vol_text = String(amp_vol) + dB_symbol;
+  lv_label_set_text((lv_obj_t *)text_label_vol_value, isMuted ? "Muted" : amp_vol_text.c_str());
 }
 
 void sourceUpdate()
@@ -624,7 +220,16 @@ void sourceUpdate()
     {
       source = 1;
     }
-    setIO();
+    if (isMuted)
+    {
+      if (!backlight)
+      {
+        backlight = ACTIVE;
+        digitalWrite(TFT_BL, HIGH);
+      }
+      isMuted = 0;
+      Muses.setVolume(volume, volume);
+    }
     // Set flag back to false so we can watch for the next move
     turnedRightFlag = false;
   }
@@ -640,12 +245,16 @@ void sourceUpdate()
     {
       source = 4;
     }
-    if (!backlight)
+    if (isMuted)
     {
-      backlight = ACTIVE;
-      digitalWrite(TFT_BL, HIGH); // Turn on backlight
+      if (!backlight)
+      {
+        backlight = ACTIVE;
+        digitalWrite(TFT_BL, HIGH);
+      }
+      isMuted = 0;
+      Muses.setVolume(volume, volume);
     }
-    setIO();
     // Set flag back to false so we can watch for the next move
     turnedLeftFlag = false;
   }
@@ -662,6 +271,14 @@ void RC5Update()
   // Poll for new RC5 command
   if (rc5.read(&toggle, &address, &command))
   {
+    /* For Debug
+    Serial.print("a:");
+    Serial.print(address);
+    Serial.print(" c:");
+    Serial.print(command);
+    Serial.print(" t:");
+    Serial.println(toggle);*/
+
     if (address == 0x10) // standard system address for preamplifier
     {
       switch (command)
@@ -676,7 +293,6 @@ void RC5Update()
           }
           oldsource = source;
           source = 1;
-          setIO();
         }
         break;
       case 3:
@@ -689,7 +305,6 @@ void RC5Update()
           }
           oldsource = source;
           source = 4;
-          setIO();
         }
         break;
       case 7:
@@ -702,7 +317,6 @@ void RC5Update()
           }
           oldsource = source;
           source = 3;
-          setIO();
         }
         break;
       case 8:
@@ -715,7 +329,6 @@ void RC5Update()
           }
           oldsource = source;
           source = 2;
-          setIO();
         }
         break;
       case 13:
@@ -726,7 +339,7 @@ void RC5Update()
         }
         break;
       case 16:
-        // Increase Vol
+        // Increase Vol / reduce attenuation
         if (isMuted)
         {
           unMute();
@@ -734,19 +347,17 @@ void RC5Update()
         if (volume < 0)
         {
           volume = volume + 1;
-          setVolume();
         }
         break;
       case 17:
-        // Reduce Vol
+        // Reduce Vol / increase attenuation
         if (isMuted)
         {
           unMute();
         }
-        if (volume != 447)
+        if (volume > -447)
         {
           volume = volume - 1;
-          setVolume();
         }
         break;
       case 59:
@@ -783,7 +394,6 @@ void RC5Update()
           }
           oldsource = source;
           source = 3;
-          setIO();
         }
       }
     }
@@ -799,23 +409,14 @@ void unMute()
     digitalWrite(TFT_BL, HIGH);
   }
   isMuted = 0;
-  //  set volume
-  setVolume();
-  // set source
-  setIO();
-  notifyClients();
+  // set volume
+  Muses.setVolume(volume, volume);
 }
 
 void mute()
 {
   isMuted = 1;
   Muses.mute();
-  tft.setTextSize(2);
-  tft.setFreeFont(FSS18);
-  tft.drawString("    Muted    ", 160, 120, 1);
-  tft.setTextSize(1);
-  tft.setFreeFont(FSS24);
-  notifyClients();
 }
 
 void toggleMute()
@@ -839,41 +440,89 @@ void RotaryUpdate()
     break;
   case STATE_IO:
     sourceUpdate();
+    /*
     if ((millis() - milOnButton) > TIME_EXITSELECT * 1000)
     {
       state = STATE_RUN;
-    }
+    }*/
     break;
   default:
     break;
   }
 }
 
-void setIO()
+void setIO(void *text_label_source, int32_t v)
 {
   MCP.write1((oldsource - 1), LOW); // Reset source select to NONE
   MCP.write1((source - 1), HIGH);   // Set new source
   preferences.putUInt("SOURCE", source);
-  if (isMuted)
-  {
-    if (!backlight)
-    {
-      backlight = ACTIVE;
-      digitalWrite(TFT_BL, HIGH);
-    }
-    isMuted = 0;
-    tft.fillScreen(TFT_WHITE);
-    // set volume
-    setVolume();
-  }
-  notifyClients();
-  tft.drawString(inputName[source - 1], 150, 200, 1);
+  lv_label_set_text((lv_obj_t *)text_label_source, inputName[source - 1]);
 }
 
-// This section of code runs only once at start-up.
+void lv_create_main_gui(void)
+{
+  // Create a text label to display the current Source
+  lv_obj_t *text_label_source = lv_label_create(lv_screen_active());
+  lv_label_set_text(text_label_source, "Phono");
+  lv_obj_set_style_text_align(text_label_source, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(text_label_source, LV_ALIGN_CENTER, 0, -80);
+  static lv_style_t style_source;
+  lv_style_init(&style_source);
+  lv_style_set_text_font(&style_source, &lv_font_montserrat_42);
+  lv_obj_add_style(text_label_source, &style_source, 0);
+  // Create an animation to update the text label with the latest source value every 10 seconds
+  lv_anim_t a_source;
+  lv_anim_init(&a_source);
+  lv_anim_set_exec_cb(&a_source, setIO);
+  lv_anim_set_duration(&a_source, 10);
+  lv_anim_set_playback_duration(&a_source, 10);
+  lv_anim_set_var(&a_source, text_label_source);
+  lv_anim_set_values(&a_source, 0, 100);
+  lv_anim_set_repeat_count(&a_source, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_start(&a_source);
+
+  // Create an Arc
+  arc = lv_arc_create(lv_screen_active());
+  lv_obj_set_size(arc, 210, 210);
+  lv_arc_set_rotation(arc, 180);
+  lv_arc_set_bg_angles(arc, -30, 210);
+  lv_arc_set_range(arc, TEMP_ARC_MIN, TEMP_ARC_MAX);
+  lv_obj_set_style_arc_color(arc, lv_color_hex(0x666666), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(arc, lv_color_hex(0x333333), LV_PART_KNOB);
+  lv_obj_align(arc, LV_ALIGN_BOTTOM_MID, 0, 40);
+
+  // Create a text label in font size 36 to display the current volume
+  lv_obj_t *text_label_vol_value = lv_label_create(lv_screen_active());
+  lv_label_set_text(text_label_vol_value, "--.--");
+  lv_obj_set_style_text_align(text_label_vol_value, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(text_label_vol_value, LV_ALIGN_CENTER, 0, 40);
+
+  static lv_style_t style_vol;
+  lv_style_init(&style_vol);
+  lv_style_set_text_font(&style_vol, &lv_font_montserrat_32);
+  lv_obj_add_style(text_label_vol_value, &style_vol, 0);
+
+  // Create an animation to update the text label with the latest temperature value every 10 seconds
+  lv_anim_t a_vol;
+  lv_anim_init(&a_vol);
+  lv_anim_set_exec_cb(&a_vol, set_volume);
+  lv_anim_set_duration(&a_vol, 10);
+  lv_anim_set_playback_duration(&a_vol, 10);
+  lv_anim_set_var(&a_vol, text_label_vol_value);
+  lv_anim_set_values(&a_vol, 0, 100);
+  lv_anim_set_repeat_count(&a_vol, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_start(&a_vol);
+}
+
 void setup()
 {
+  String LVGL_Arduino = String("LVGL Library Version: ") + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
   Serial.begin(115200);
+  Serial.println(LVGL_Arduino);
+  // Start LVGL
+  lv_init();
+  // Register print function for debugging
+  lv_log_register_print_cb(log_print);
 
   // This tells the library that the encoder has no pull-up resistors and to use ESP32 internal ones
   rotaryEncoder.setEncoderType(EncoderType::FLOATING);
@@ -892,45 +541,6 @@ void setup()
   // This is where the rotary inputs are configured and the interrupts get attached
   rotaryEncoder.begin();
 
-  initLittleFS();
-  initWiFi();
-  if (!MDNS.begin("esp32HiFi"))
-  {
-    Serial.println("Error setting up MDNS responder!");
-    while (1)
-    {
-      delay(1000);
-    }
-  }
-  initWebSocket();
-  initWebServer();
-
-  // Initialise the TFT screen
-  tft.init();
-  tft.setRotation(1);
-
-  // Set text datum to middle centre
-  tft.setTextDatum(MC_DATUM);
-  tft.setFreeFont(FSS18);
-
-  // Clear the screen
-  tft.fillScreen(TFT_WHITE);
-  // show software version briefly in display
-
-  tft.setTextColor(TFT_BLUE, TFT_WHITE);
-  tft.drawString(softTitle1, 160, 80, 1);
-  tft.drawString(softTitle2, 160, 120, 1);
-  tft.drawString("SW ver " VERSION_NUM, 160, 160, 1);
-  delay(2000);
-
-/*
-  // Init and get the time
-  initTime("GMT0BST,M3.5.0/1,M10.4.0"); // Set for Europe / London
-*/
-
-  tft.setFreeFont(FSS24);
-  tft.fillScreen(TFT_WHITE);
-
   // This initialises the Source select pins as outputs, all deselected (i.e. o/p=low)
   MCP.begin();
   MCP.pinMode8(0x00); //  0 = output , 1 = input
@@ -944,20 +554,25 @@ void setup()
   preferences.begin("settings", RW_MODE);
   source = preferences.getUInt("SOURCE", 1);
   volume = preferences.getInt("VOLUME", -447);
-  /*printLocalTime();
-  */
+  if (volume > 0)
+    volume = -447;
   delay(10);
-  // set startup volume
-  setVolume();
-  // set source
-  setIO();
-  // unmute
-  isMuted = 0;
+
+  // Create a display object
+  lv_display_t *disp;
+  // Initialize the TFT display using the TFT_eSPI library
+  disp = lv_tft_espi_create(SCREEN_WIDTH, SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
+  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+  // Function to draw the GUI
+  isMuted = 1;
+  lv_create_main_gui();
 }
 
 void loop()
 {
   RC5Update();
   RotaryUpdate();
-  // printLocalTime();
+  lv_task_handler(); // let the GUI do its work
+  lv_tick_inc(5);    // tell LVGL how much time has passed
+  delay(5);          // let this time pass
 }

@@ -16,20 +16,14 @@ An Infra-red receiver module (TSOP4836) provides remote control of volume level,
 
 The MUSE72323 stereo digital volume control provides independently programmable gain of each channel from -111.75dB to 0dB together with mute. Communication between the ESP32 and the MUSE72323 is via an SPI bus.
 
-The 320x240 TFT display with an SPI interface provides visual data for source input selected, atten setting (-111.75dB to 0dB) and mute status. It also includes a clock.
-
-Additional functionality is provided by use of the ESP32's built-in peripherals. These are
-* WiFi remote control of volume, source selection and mute
-* OTA software update capability
+The 320x240 TFT display with an SPI interface provides visual data for source input selected, atten setting (-111.75dB to 0dB) and mute status.
 
 Code Libraries
 =================
 Interfacing with the TFT display, source selector, IR decoder, rotary encoder/switch, WiFi and NTP uses shared libraries. These are
-* TFT_eSPI (PlatformIO libdeps value = bodmer/TFT_eSPI@^2.3.70)
-* RC5    https://github.com/guyc/RC5
-* ESP32RotaryEncoder (PlatformIO libdeps value = maffooclock/ESP32RotaryEncoder@^1.1.0)
+* TFT_eSPI              (PlatformIO libdeps value = bodmer/TFT_eSPI@^2.3.70)
+* LVGL                  (PlatformIO libdeps value = lvgl/lvgl@^9.2.0)
+* RC5                   https://github.com/guyc/RC5
+* ESP32RotaryEncoder    (PlatformIO libdeps value = maffooclock/ESP32RotaryEncoder@^1.1.0)
 * MCP23S08 SPI bus expander for source selector (PlatformIO libdeps value = robtillaart/MCP23S08@^0.4.0)
-* MUSES72323    https://github.com/GeoffWebster/Muses72323
-* https://github.com/me-no-dev/ESPAsyncWebServer.git
-* ArduinoJson
-* ayushsharma82/ElegantOTA@^3.1.0
+* MUSES72323            https://github.com/GeoffWebster/Muses72323
