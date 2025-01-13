@@ -52,7 +52,7 @@ float atten;           // current attenuation, between 0 and -111.75
 int16_t volume = -447; // current volume, between 0 and -447
 int16_t oldvolume = -447;
 bool backlight; // current backlight state
-uint16_t counter = 0;
+int16_t counter = 0;
 uint8_t source;        // current input channel
 uint8_t oldsource = 1; // previous input channel
 bool isMuted;          // current mute status
@@ -154,6 +154,8 @@ void knobCallback(long value)
   }
   // Override the tracked value back to 0 so that
   // we can continue tracking right/left events
+  Serial.print("Counter = ");
+  Serial.println(counter);
   rotaryEncoder.setEncoderValue(0);
 }
 
@@ -201,7 +203,7 @@ void volumeUpdate()
     }
     if (volume > -447)
     {
-      volume = volume - counter;
+      volume = volume + counter;
       if (volume < -447)
       {
         volume = -447;
